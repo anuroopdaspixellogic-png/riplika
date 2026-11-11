@@ -11,3 +11,12 @@ skills-lock.json
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Android release signing secrets
+android/keystore/
+android/keystore.properties
+*.jks
+*.keystore
+
+# Locally produced installers
+artifacts/

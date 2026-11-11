@@ -18,6 +18,7 @@ import {
   XIcon,
 } from './Icons'
 import { countryFlag, countryName } from '../lib/countries'
+import { websocketUrl } from '../lib/api'
 import type { ChatMessage, MediaState, Partner, Phase, Profile, PublicStats } from '../lib/types'
 import { ReportModal, type ReportReason } from './ReportModal'
 
@@ -420,8 +421,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
   }
 
   function connect() {
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws`)
+    const ws = new WebSocket(websocketUrl())
     wsRef.current = ws
 
     ws.onopen = () => {

@@ -77,3 +77,44 @@ jobs:
             http://localhost:8787/moderation)" = "200"
           rm -f "$COOKIE_JAR"
           echo "Moderation auth and security headers passed."
+
+  android:
+    name: Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22.13.0'
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Build debug APK
+        env:
+          # Placeholder backend: CI only proves the native build still works.
+          VITE_API_ORIGIN: https://ci.invalid
+        run: npm run android:apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: riplika-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

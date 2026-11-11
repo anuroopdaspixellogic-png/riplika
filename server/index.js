@@ -46,6 +46,15 @@ const APP_CSP = [
   "form-action 'self'",
 ].join('; ')
 
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost'])
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true
+  if (NATIVE_APP_ORIGINS.has(origin) || LOCAL_ORIGIN.test(origin)) return true
+  return ALLOWED_ORIGINS.includes(origin)
+}
+
 const app = express()
 app.disable('x-powered-by')
 if (TRUST_PROXY) app.set('trust proxy', 1)
@@ -54,6 +63,23 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=()')
+  next()
+})
+// The Android/iOS app is bundled on https://localhost and calls the backend
+// from a different origin, so it needs CORS. Browser builds on the same
+// origin, and configured ALLOWED_ORIGINS, keep working unchanged.
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
+  if (req.method === 'OPTIONS') {
+    res.status(204).end()
+    return
+  }
   next()
 })
 
@@ -747,7 +773,7 @@ server.on('upgrade', (req, socket, head) => {
   }
 
   const origin = req.headers.origin
-  if (ALLOWED_ORIGINS.length && origin && !ALLOWED_ORIGINS.includes(origin)) {
+  if (origin && !isAllowedOrigin(origin)) {
     socket.destroy()
     return
   }

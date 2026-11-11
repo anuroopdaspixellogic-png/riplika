@@ -78,6 +78,12 @@ day. Blocks do not expire so a reported pair is never matched again.
 | `npm run docker:build` | Build the production image as `riplika:latest` |
 | `npm run docker:up` | Build and start the Compose stack in the background |
 | `npm run docker:down` | Stop the stack (the data volume is kept) |
+| `npm run android:check` | Validate `VITE_API_ORIGIN` for an Android build |
+| `npm run android:sync` | Build the web client and copy it into the Android project |
+| `npm run android:apk` | Build a debug APK (requires `VITE_API_ORIGIN`) |
+| `npm run android:release-apk` | Build a release-signed APK |
+| `npm run android:bundle` | Build a release-signed AAB for Google Play |
+| `npm run android:open` | Open the project in Android Studio |
 
 Run the server checks while the dev server (or a production server) is up:
 
@@ -93,6 +99,68 @@ manual dispatch. On Node 22.13 (the minimum) and Node 24 it installs from the
 lockfile, type-checks and builds, runs the SQLite persistence tests, then starts
 the production server with an in-memory database and runs the 24 server checks
 plus moderation-auth and security-header checks.
+
+## Android
+
+The client is packaged with Capacitor. The native project is in `android/` and
+serves the bundled web build from `https://localhost` inside the WebView, so the
+phone must call an absolute backend URL:
+
+```bash
+VITE_API_ORIGIN=https://chat.example.com npm run android:apk
+```
+
+`VITE_API_ORIGIN` is compiled into the client. The backend must be reachable over
+HTTPS (WebSocket uses `wss://` automatically) and camera/microphone access
+requires a secure context. Localhost is only useful with an emulator.
+
+### Prerequisites
+
+- JDK 21
+- Android SDK platform 36 and build-tools 36.0.0
+- `android/local.properties` containing `sdk.dir=/path/to/android-sdk`
+
+`scripts/android-build.mjs` looks for `JAVA_HOME`, macOS `java_home`, Homebrew
+JDKs and common SDK locations. Override them with `JAVA_HOME` / `ANDROID_HOME`
+when needed.
+
+### Builds
+
+```bash
+# Debug APK — for device testing, signed with the local debug key.
+VITE_API_ORIGIN=https://chat.example.com npm run android:apk
+# android/app/build/outputs/apk/debug/app-debug.apk
+
+# Release APK + AAB — signed with android/keystore.properties.
+VITE_API_ORIGIN=https://chat.example.com npm run android:release-apk
+VITE_API_ORIGIN=https://chat.example.com npm run android:bundle
+# android/app/build/outputs/bundle/release/app-release.aab
+```
+
+Google Play requires the **AAB**, not an APK. The release build reads signing
+credentials from `android/keystore.properties` and a keystore at
+`android/keystore/riplika-upload.jks`. Both are gitignored and must be backed up
+securely — without them you cannot publish updates unless Play App Signing
+recovery is used.
+
+To create a fresh upload key on another machine:
+
+```bash
+keytool -genkeypair -v -keystore android/keystore/riplika-upload.jks \
+  -alias riplika -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Then create `android/keystore.properties`:
+
+```properties
+storeFile=../keystore/riplika-upload.jks
+storePassword=...
+keyAlias=riplika
+keyPassword=...
+```
+
+Before uploading, see **[docs/play-store.md](docs/play-store.md)** for the
+declarations, store listing assets and release checklist.
 
 ## Production
 

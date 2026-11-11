@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Landing } from './components/Landing'
 import { ChatRoom } from './components/ChatRoom'
+import { apiUrl } from './lib/api'
 import type { Profile, PublicStats } from './lib/types'
 
 export default function App() {
@@ -13,7 +14,7 @@ export default function App() {
 
     async function load() {
       try {
-        const response = await fetch('/api/stats')
+        const response = await fetch(apiUrl('/api/stats'))
         if (!response.ok) return
         const data = (await response.json()) as PublicStats
         if (!cancelled) setStats(data)
