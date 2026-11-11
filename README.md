@@ -160,7 +160,10 @@ keyPassword=...
 ```
 
 Before uploading, see **[docs/play-store.md](docs/play-store.md)** for the
-declarations, store listing assets and release checklist.
+declarations, store listing assets and release checklist. Draft legal documents
+are included in **[docs/privacy-policy.md](docs/privacy-policy.md)** and
+**[docs/terms.md](docs/terms.md)** — fill in the placeholders and publish them
+before submitting the app.
 
 ## Production
 

@@ -11,7 +11,11 @@ build. Complete every item below before promoting a release to production.
 - [ ] Set `VITE_API_ORIGIN` to that domain for every Android release build.
 - [ ] Add `TRUST_PROXY=1` if the app runs behind a trusted reverse proxy.
 - [ ] Publish a privacy policy at a public URL and enter it in Play Console.
+      A draft template is in [`docs/privacy-policy.md`](privacy-policy.md) — fill
+      in the placeholders, have it reviewed, then publish it (for example with
+      GitHub Pages served from `/docs`).
 - [ ] Publish terms of service / community guidelines and link them in the app.
+      A draft template is in [`docs/terms.md`](terms.md).
 - [ ] Provide a support email that is monitored.
 
 The policy should cover: camera and microphone access, peer-to-peer media, chat
@@ -70,7 +74,9 @@ aapt dump badging android/app/build/outputs/apk/release/app-release.apk | head
    - Short description (max 80 characters)
    - Full description (max 4000 characters)
    - App icon: 512 × 512 PNG, 32-bit, no transparency
+     (`assets/play/icon-512.png` is ready)
    - Feature graphic: 1024 × 500 PNG/JPEG
+     (`assets/play/feature-graphic-1024x500.png` is ready)
    - Phone screenshots: 2–8 images, 16:9 or 9:16, minimum 320 px
    - Optional tablet screenshots if you support tablets
 4. Complete **Store settings** and choose the countries/regions to publish in.
