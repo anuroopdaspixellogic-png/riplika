@@ -91,8 +91,8 @@ function join(client, profile, key) {
   return client.waitFor((message) => message.type === 'welcome', 'welcome')
 }
 
-function waitType(client, type, label = type) {
-  return client.waitFor((message) => message.type === type, label)
+function waitType(client, type, label = type, timeout = 2500) {
+  return client.waitFor((message) => message.type === type, label, timeout)
 }
 
 async function main() {
