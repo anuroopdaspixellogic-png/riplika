@@ -31,3 +31,25 @@ export function websocketUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${protocol}://${window.location.host}/ws`
 }
+
+export interface TurnConfig {
+  url: string
+  username?: string
+  credential?: string
+}
+
+/**
+ * TURN settings are served by the backend so they can be changed without
+ * rebuilding the client. The Android app has its bundle baked in, so a
+ * runtime lookup is the only way to rotate TURN credentials in the field.
+ */
+export async function fetchTurnConfig(): Promise<TurnConfig | null> {
+  try {
+    const response = await fetch(apiUrl('/api/config'), { cache: 'no-store' })
+    if (!response.ok) return null
+    const data = (await response.json()) as { turn?: TurnConfig | null }
+    return data.turn ?? null
+  } catch {
+    return null
+  }
+}

@@ -70,6 +70,9 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/moderation)" = "401"
           curl -sI http://localhost:8787/ | grep -qi '^content-security-policy:'
 
+          # Runtime client config (TURN) must be served as JSON.
+          curl -fsS http://localhost:8787/api/config | grep -q '"turn"'
+
           COOKIE_JAR="$(mktemp)"
           test "$(curl -s -o /dev/null -w '%{http_code}' -c "$COOKIE_JAR" -X POST \
             -d "token=$MODERATION_TOKEN" http://localhost:8787/moderation/login)" = "303"

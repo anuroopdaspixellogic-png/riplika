@@ -84,6 +84,7 @@ day. Blocks do not expire so a reported pair is never matched again.
 | `npm run android:release-apk` | Build a release-signed APK |
 | `npm run android:bundle` | Build a release-signed AAB for Google Play |
 | `npm run android:open` | Open the project in Android Studio |
+| `npm run tunnel` | Run the production server behind a temporary public HTTPS tunnel |
 
 Run the server checks while the dev server (or a production server) is up:
 
@@ -235,6 +236,34 @@ A bind mount (`./data:/app/data`) works too; on Linux make sure the directory is
 writable by UID 1000 (`chown -R 1000:1000 data`). The matching queue and rate
 limits are in-process, so run one container behind the proxy.
 
+### Hosting the backend
+
+The Android app needs a public HTTPS address for the backend. Two options:
+
+**Temporary tunnel from this machine** — good for testing a real phone:
+
+```bash
+brew install cloudflared     # once
+npm run tunnel               # prints https://<random>.trycloudflare.com
+npm run tunnel -- --apk      # ...and builds an APK for that URL
+```
+
+The tunnel URL changes whenever it restarts, so it cannot be used for a store
+release.
+
+**Permanent hosting** — `render.yaml` is a Render blueprint. Open
+<https://render.com/deploy>, pick this repository, and Render builds it and
+gives you a stable `https://riplika.onrender.com` address with TLS included.
+Attach a custom domain under **Settings > Domains**, then rebuild the app:
+
+```bash
+VITE_API_ORIGIN=https://riplika.onrender.com npm run android:bundle
+```
+
+The same `Dockerfile` and `compose.yaml` work on any Docker host (Fly.io, Railway,
+a VPS, NAS). The server only needs to expose `PORT` and pass WebSocket upgrades
+through the proxy.
+
 ### Reverse proxy and TLS
 
 Camera/mic access requires HTTPS. A minimal Caddy setup handles certificates and
@@ -282,7 +311,10 @@ are passed to the container at runtime.
 | `DEMO_PARTNER` | server | Set `0` to disable the solo demo partner (default on) |
 | `DEMO_WAIT_SECONDS` | server | Seconds before the demo partner joins an empty queue (default `10`) |
 | `ALLOWED_ORIGINS` | server | Comma-separated WebSocket origin allowlist (optional) |
-| `VITE_TURN_URL` | client | TURN server URL, e.g. `turn:turn.example.com:3478` |
+| `TURN_URL` | server | TURN server URL served to clients at runtime (e.g. `turn:turn.example.com:3478`) |
+| `TURN_USERNAME` | server | TURN username served to clients |
+| `TURN_CREDENTIAL` | server | TURN credential served to clients |
+| `VITE_TURN_URL` | client | TURN server URL baked into the client at build time |
 | `VITE_TURN_USERNAME` | client | TURN username |
 | `VITE_TURN_CREDENTIAL` | client | TURN credential |
 
@@ -290,6 +322,11 @@ STUN is configured for Google's public STUN servers. **Add a TURN server for
 production** — symmetric NATs and restrictive mobile networks will otherwise fail
 to connect. Static TURN credentials in `VITE_*` are visible to clients; use
 short-lived TURN credentials issued by your backend for a public service.
+
+TURN settings can also be provided at runtime through `TURN_URL`,
+`TURN_USERNAME` and `TURN_CREDENTIAL`. The client reads them from
+`/api/config` when it starts, so a relay can be added or rotated by restarting
+the server — no rebuild of the web bundle or the Android app.
 
 ## Architecture
 

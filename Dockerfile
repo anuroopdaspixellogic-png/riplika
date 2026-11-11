@@ -26,6 +26,12 @@ ENV NODE_ENV=production \
     PORT=8787 \
     SQLITE_PATH=/app/data/riplika.sqlite
 
+# Runtime TURN relay. The client fetches these from /api/config, so they can
+# be changed by restarting the container without rebuilding the image.
+ENV TURN_URL="" \
+    TURN_USERNAME="" \
+    TURN_CREDENTIAL=""
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 

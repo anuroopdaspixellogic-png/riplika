@@ -147,6 +147,9 @@ function resolveStorePath() {
 function openStore() {
   const file = resolveStorePath()
   try {
+    if (file !== ':memory:') {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+    }
     const created = createStore(file)
     console.log(`Storage: SQLite at ${file}`)
     return created
@@ -811,6 +814,21 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/stats', (_req, res) => {
   recomputeStats()
   res.json(stats)
+})
+
+// Runtime client configuration. TURN credentials are read from the
+// environment so they can be rotated or replaced without rebuilding the
+// client, which matters for the Android app where the bundle is baked in.
+app.get('/api/config', (_req, res) => {
+  const turnUrl = (process.env.TURN_URL || '').trim()
+  const turn = turnUrl
+    ? {
+        url: turnUrl,
+        username: (process.env.TURN_USERNAME || '').trim() || undefined,
+        credential: (process.env.TURN_CREDENTIAL || '').trim() || undefined,
+      }
+    : null
+  res.json({ turn })
 })
 
 // Serve the built client in production. In development Vite serves the app and proxies here.

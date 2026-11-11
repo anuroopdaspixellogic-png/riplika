@@ -1,0 +1,59 @@
+# Render blueprint for Riplika.
+#
+# Deploy in two steps:
+#   1. Open https://render.com/deploy and pick this repository, or press
+#      "New Blueprint Instance" from the repo page.
+#   2. Render builds the app and gives you a URL like
+#      https://riplika.onrender.com
+#
+# Then rebuild the Android app against that URL:
+#   VITE_API_ORIGIN=https://riplika.onrender.com npm run android:bundle
+#
+# Notes:
+# - The free plan sleeps after inactivity (the first request after a sleep
+#   takes a few seconds) and its filesystem is ephemeral, so moderation
+#   reports and blocks are lost when the service restarts or redeploys.
+#   Attach a persistent disk for a real launch (see the commented block
+#   below, which needs a paid instance).
+# - TURN settings are read at runtime from /api/config, so no rebuild is
+#   needed to add or rotate a TURN relay.
+# - Set a custom domain under Settings > Domains for a stable address, or
+#   use the render.com hostname.
+
+services:
+  - type: web
+    name: riplika
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render terminates TLS and forwards the client IP in X-Forwarded-For.
+      - key: TRUST_PROXY
+        value: '1'
+      # Render generates a random token; read it from the dashboard.
+      - key: MODERATION_TOKEN
+        generateValue: true
+      - key: DEMO_PARTNER
+        value: '1'
+      - key: DEMO_WAIT_SECONDS
+        value: '10'
+      # Fill these in the dashboard once you have a TURN relay.
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+      # With a persistent disk mounted at /var/data:
+      # - key: SQLITE_PATH
+      #   value: /var/data/riplika.sqlite
+      #
+      # disk:
+      #   name: riplika-data
+      #   mountPath: /var/data
+      #   sizeGB: 1

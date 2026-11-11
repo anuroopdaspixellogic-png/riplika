@@ -18,7 +18,7 @@ import {
   XIcon,
 } from './Icons'
 import { countryFlag, countryName } from '../lib/countries'
-import { websocketUrl } from '../lib/api'
+import { fetchTurnConfig, websocketUrl, type TurnConfig } from '../lib/api'
 import type { ChatMessage, MediaState, Partner, Phase, Profile, PublicStats } from '../lib/types'
 import { ReportModal, type ReportReason } from './ReportModal'
 
@@ -85,6 +85,20 @@ if (TURN_URL) {
   })
 }
 
+/**
+ * The backend can hand out TURN settings at runtime, which overrides the
+ * build-time ones. Without a TURN relay, calls fail on restrictive mobile
+ * networks and symmetric NATs.
+ */
+function iceServers(turn: TurnConfig | null): RTCIceServer[] {
+  const servers = ICE_SERVERS.filter((server) => !String(server.urls).startsWith('turn'))
+  if (!turn?.url) return servers
+  return [
+    ...servers,
+    { urls: turn.url, username: turn.username, credential: turn.credential },
+  ]
+}
+
 function getClientKey(): string {
   const storageKey = 'riplika:clientKey'
   try {
@@ -129,6 +143,8 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const wsRef = useRef<WebSocket | null>(null)
+
+  const turnRef = useRef<TurnConfig | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const pendingIceRef = useRef<RTCIceCandidateInit[]>([])
@@ -207,7 +223,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
 
   function createPeer(initiator: boolean): RTCPeerConnection {
     teardownPeer()
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = new RTCPeerConnection({ iceServers: iceServers(turnRef.current) })
     pcRef.current = pc
 
     const stream = localStreamRef.current
@@ -593,11 +609,18 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
     let cancelled = false
 
     async function boot() {
+      // Fetch runtime TURN settings while the camera and microphone prompts
+      // are on screen, so they are ready before the first peer connection.
+      const turn = await Promise.race([
+        fetchTurnConfig(),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 3000)),
+      ])
       const stream = await acquireMedia()
       if (cancelled) {
         stream?.getTracks().forEach((track) => track.stop())
         return
       }
+      turnRef.current = turn
       setMediaSettled(true)
       connect()
     }
