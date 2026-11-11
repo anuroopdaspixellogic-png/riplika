@@ -1,0 +1,26 @@
+<svg width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="26%" cy="45%" r="85%">
+      <stop offset="0" stop-color="#12454c"/>
+      <stop offset="0.5" stop-color="#0a1a20"/>
+      <stop offset="1" stop-color="#05080c"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#18c9ce" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#07848c" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="196" y1="196" x2="260" y2="268" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14c3c8"/>
+      <stop offset="1" stop-color="#07848c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bg)"/>
+  <circle cx="250" cy="250" r="220" fill="none" stroke="url(#ring)" stroke-width="2"/>
+  <g transform="translate(140 140) scale(5.5)">
+    <path d="M10 7.5h15a6.5 6.5 0 0 1 6.5 6.5v8a6.5 6.5 0 0 1-6.5 6.5h-8.3L10 34V7.5z" fill="#fff"/>
+    <circle cx="20.5" cy="17.5" r="4.6" fill="url(#lens)"/>
+    <circle cx="22.2" cy="15.8" r="1.35" fill="#fff" fill-opacity=".9"/>
+  </g>
+  <text x="430" y="235" font-family="Helvetica, Arial, sans-serif" font-size="104" font-weight="700" fill="#ffffff" letter-spacing="-2">riplika<tspan fill="#14c3c8">.</tspan></text>
+  <text x="436" y="292" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="400" fill="#9fb4bb">Meet someone new, right now.</text>
+</svg>
