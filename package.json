@@ -1,0 +1,40 @@
+{
+  "name": "riplika",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Riplika — anonymous random video chat. Meet someone new, right now.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "node --env-file-if-exists=.env --watch server/index.js",
+    "dev:web": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.js",
+    "preview": "vite preview",
+    "smoke": "node scripts/store-smoke.mjs && node scripts/smoke.mjs",
+    "smoke:store": "node scripts/store-smoke.mjs",
+    "smoke:server": "node scripts/smoke.mjs",
+    "docker:build": "docker build -t riplika .",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}

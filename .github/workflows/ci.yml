@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.13.0 is the documented minimum (first release with unflagged
+        # node:sqlite); 24 matches the production Docker image.
+        node: ['22.13.0', '24']
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: SQLite persistence tests
+        run: npm run smoke:store
+
+      - name: Server smoke tests
+        env:
+          NODE_ENV: production
+          PORT: 8787
+          SQLITE_PATH: ':memory:'
+          MODERATION_TOKEN: ci-moderation-token-0123456789abcdef
+        run: |
+          node server/index.js &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://localhost:8787/api/health > /dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://localhost:8787/api/health
+
+          npm run smoke:server
+
+          # The production app and moderation dashboard must stay protected.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/moderation)" = "401"
+          curl -sI http://localhost:8787/ | grep -qi '^content-security-policy:'
+
+          COOKIE_JAR="$(mktemp)"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -c "$COOKIE_JAR" -X POST \
+            -d "token=$MODERATION_TOKEN" http://localhost:8787/moderation/login)" = "303"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" \
+            http://localhost:8787/moderation)" = "200"
+          rm -f "$COOKIE_JAR"
+          echo "Moderation auth and security headers passed."

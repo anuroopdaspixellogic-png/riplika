@@ -1,0 +1,13 @@
+node_modules/
+dist/
+data/
+.env
+.env.local
+.refs/
+.agents/
+skills-lock.json
+.DS_Store
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

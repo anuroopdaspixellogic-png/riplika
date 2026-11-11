@@ -1,0 +1,28 @@
+services:
+  riplika:
+    build:
+      context: .
+      args:
+        VITE_TURN_URL: ${VITE_TURN_URL:-}
+        VITE_TURN_USERNAME: ${VITE_TURN_USERNAME:-}
+        VITE_TURN_CREDENTIAL: ${VITE_TURN_CREDENTIAL:-}
+    image: riplika:latest
+    container_name: riplika
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    ports:
+      # Bound to localhost: put HTTPS (Caddy, nginx, a tunnel) in front.
+      - "127.0.0.1:${PORT:-8787}:${PORT:-8787}"
+    volumes:
+      - riplika-data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  riplika-data:
+    name: riplika-data
