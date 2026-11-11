@@ -1,0 +1,12 @@
+{
+  "appId": "com.riplika.app",
+  "appName": "Riplika",
+  "webDir": "dist",
+  "backgroundColor": "#080b10",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
