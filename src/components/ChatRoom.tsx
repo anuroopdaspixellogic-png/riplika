@@ -33,7 +33,7 @@ type SignalData =
   | { kind: 'ice'; candidate: RTCIceCandidateInit }
 
 type ServerMessage =
-  | ({ type: 'welcome'; id: string } & PublicStats)
+  | ({ type: 'welcome'; id: string; demoWaitSeconds?: number } & PublicStats)
   | ({ type: 'stats' } & PublicStats)
   | { type: 'queued' }
   | { type: 'matched'; roomId: string; initiator: boolean; partner: Partner }
@@ -124,6 +124,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
   const [seconds, setSeconds] = useState(0)
   const [tipIndex, setTipIndex] = useState(0)
   const [stats, setStats] = useState<PublicStats | null>(null)
+  const [demoWaitSeconds, setDemoWaitSeconds] = useState(0)
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -457,6 +458,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
           }
           setStats(nextStats)
           onStats(nextStats)
+          setDemoWaitSeconds(message.demoWaitSeconds ?? 0)
           setPhase('searching')
           send({ type: 'find' })
           break
@@ -480,6 +482,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
         }
 
         case 'matched': {
+          const isDemo = Boolean(message.partner.demo)
           setPartner(message.partner)
           setPartnerMedia(null)
           setPartnerTyping(false)
@@ -490,12 +493,18 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
             {
               id: `system-${Date.now()}`,
               from: 'system',
-              text: `You're connected with ${message.partner.nickname} ${countryFlag(message.partner.country)}. Say hi 👋`,
+              text: isDemo
+                ? "You're connected with the Demo Partner 🤖 — a bot so you can try Riplika solo. Real people are always matched first."
+                : `You're connected with ${message.partner.nickname} ${countryFlag(message.partner.country)}. Say hi 👋`,
               ts: Date.now(),
             },
           ])
           setPhase('matched')
           setReportOpen(false)
+          if (isDemo) {
+            setPartnerMedia({ cam: false, mic: false })
+            break
+          }
           const pc = createPeer(message.initiator)
           if (message.initiator) void startOffer(pc)
           window.setTimeout(sendCurrentMedia, 120)
@@ -898,6 +907,11 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
                   <span className="live-dot" /> {stats.searching} in the queue
                 </span>
               ) : null}
+              {demoWaitSeconds > 0 ? (
+                <p className="search-demo">
+                  🤖 No one else waiting? A demo partner will say hi in about {demoWaitSeconds}s.
+                </p>
+              ) : null}
               {!hasVideo ? (
                 <p className="search-media">
                   <VideoOffIcon size={13} /> Browsing without a camera — you can still chat by text.
@@ -937,9 +951,11 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
                   </div>
                   <h2>{partnerMedia?.cam === false ? `${partner.nickname} is off camera` : `Connecting to ${partner.nickname}…`}</h2>
                   <p>
-                    {partnerMedia?.cam === false
-                      ? 'Say hi in the chat — they can still type back.'
-                      : 'This usually takes a second. Their video will appear here.'}
+                    {partner.demo
+                      ? 'This is a demo bot so you can try the chat solo. Real people are always matched first.'
+                      : partnerMedia?.cam === false
+                        ? 'Say hi in the chat — they can still type back.'
+                        : 'This usually takes a second. Their video will appear here.'}
                   </p>
                 </div>
               ) : null}
@@ -957,7 +973,7 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
                   <span className="partner-flag">{countryFlag(partner.country)}</span>
                   <div className="partner-meta">
                     <strong>{partner.nickname}</strong>
-                    <span>{countryName(partner.country)}</span>
+                    <span>{partner.demo ? 'Demo bot · replies are automatic' : countryName(partner.country)}</span>
                   </div>
                   {partnerMedia?.mic === false ? (
                     <span className="chip-icon" title="Microphone muted">
@@ -1079,8 +1095,8 @@ export function ChatRoom({ profile, onExit, onReconnect, onStats }: ChatRoomProp
                 <div>
                   <strong>{partner.nickname}</strong>
                   <span>
-                    {countryName(partner.country)}
-                    {partnerMedia?.mic === false ? ' · muted' : ''}
+                    {partner.demo ? 'Demo bot' : countryName(partner.country)}
+                    {partnerMedia?.mic === false && !partner.demo ? ' · muted' : ''}
                   </span>
                 </div>
                 <span className="chat-live">

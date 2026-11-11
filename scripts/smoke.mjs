@@ -198,6 +198,38 @@ async function main() {
   check('chat spam is rate limited', chatLimited.message.includes('Slow down'))
 
   for (const client of [a, b, c, d, e, f, g, h]) client.close()
+  await new Promise((resolve) => setTimeout(resolve, 250))
+
+  // With the queue empty, a solo visitor should be offered the demo partner.
+  const solo = makeClient('Solo')
+  await solo.open()
+  const soloWelcome = await join(solo, {}, `smoke-solo-${RUN}`)
+  const demoWaitSeconds = soloWelcome.demoWaitSeconds ?? 0
+  if (demoWaitSeconds > 0) {
+    solo.send({ type: 'find' })
+    const demoMatch = await waitType(solo, 'matched', 'demo partner', (demoWaitSeconds + 3) * 1000)
+    check(
+      'empty queue offers a labelled demo partner',
+      demoMatch.partner.demo === true && demoMatch.partner.nickname === 'Demo Partner',
+    )
+    const greeting = await solo.waitFor(
+      (message) => message.type === 'chat' && message.from === 'them',
+      'demo greeting',
+      4000,
+    )
+    check('demo partner greets the visitor', typeof greeting.text === 'string' && greeting.text.length > 0)
+    solo.send({ type: 'chat', text: 'hello demo' })
+    const demoReply = await solo.waitFor(
+      (message) => message.type === 'chat' && message.from === 'them' && message.ts > greeting.ts,
+      'demo reply',
+      4000,
+    )
+    check('demo partner replies to text chat', typeof demoReply.text === 'string' && demoReply.text.length > 0)
+  } else {
+    check('demo partner is disabled', true)
+  }
+  solo.close()
+
   console.log(`\n${passed} passed, ${failed} failed`)
   process.exit(failed ? 1 : 0)
 }

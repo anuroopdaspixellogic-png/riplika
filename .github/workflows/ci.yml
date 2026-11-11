@@ -49,6 +49,7 @@ jobs:
           PORT: 8787
           SQLITE_PATH: ':memory:'
           MODERATION_TOKEN: ci-moderation-token-0123456789abcdef
+          DEMO_WAIT_SECONDS: 2
         run: |
           node server/index.js &
           SERVER_PID=$!

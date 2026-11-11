@@ -2078,6 +2078,17 @@ video {
   color: #7f95a8 !important;
 }
 
+.search-demo {
+  max-width: 380px;
+  margin: -2px 0 14px !important;
+  padding: 8px 12px;
+  border: 1px dashed rgba(127, 230, 227, 0.25);
+  border-radius: 10px;
+  background: rgba(18, 184, 189, 0.07);
+  font-size: 0.7rem !important;
+  color: #9fc9c7 !important;
+}
+
 .search-panel .btn-ghost-light {
   padding: 9px 15px;
   border-radius: 10px;

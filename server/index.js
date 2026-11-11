@@ -22,6 +22,10 @@ const ACTION_LIMIT = 12
 const REPORT_COOLDOWN_MS = 10_000
 const REPORT_RETENTION_DAYS = positiveInt(process.env.REPORT_RETENTION_DAYS, 90)
 const MAX_CONNECTIONS_PER_IP = positiveInt(process.env.MAX_CONNECTIONS_PER_IP, 8)
+// When nobody real is waiting, pair with a clearly labelled demo bot so a
+// single visitor can still try the chat. Set DEMO_PARTNER=0 to disable.
+const DEMO_PARTNER_ENABLED = !/^(0|false|no)$/i.test(process.env.DEMO_PARTNER || '1')
+const DEMO_WAIT_MS = positiveInt(process.env.DEMO_WAIT_SECONDS, 10) * 1000
 const TRUST_PROXY = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY || '')
 const MODERATION_TOKEN = (process.env.MODERATION_TOKEN || '').trim()
 const ALLOWED_ORIGINS =
@@ -66,6 +70,10 @@ const blocks = new Map()
 const connectionsByIp = new Map()
 /** clientKey -> timestamp of the last accepted report. */
 const reportCooldowns = new Map()
+/** Socket -> timer that will offer a demo partner if the queue stays empty. */
+const demoTimers = new WeakMap()
+/** Demo bot -> set of pending typing/chat timers. */
+const demoReplies = new WeakMap()
 
 const store = openStore()
 for (const { ownerKey, blockedKey } of store.loadBlocks()) {
@@ -166,6 +174,7 @@ function publicProfile(state) {
     nickname: state.profile.nickname || 'Stranger',
     country: state.profile.country,
     gender: state.profile.gender,
+    ...(state.demo ? { demo: true } : {}),
   }
 }
 
@@ -205,6 +214,148 @@ function leaveQueue(ws) {
   const index = queue.indexOf(ws)
   if (index !== -1) queue.splice(index, 1)
   ws.state.searching = false
+  clearDemoTimer(ws)
+}
+
+function clearDemoTimer(ws) {
+  const timer = demoTimers.get(ws)
+  if (timer) {
+    clearTimeout(timer)
+    demoTimers.delete(ws)
+  }
+}
+
+function clearDemoReplies(bot) {
+  const timers = demoReplies.get(bot)
+  if (timers) {
+    for (const timer of timers) clearTimeout(timer)
+    timers.clear()
+    demoReplies.delete(bot)
+  }
+  bot.state.replyPending = false
+}
+
+function trackDemoReply(bot, timer) {
+  if (typeof timer.unref === 'function') timer.unref()
+  if (!demoReplies.has(bot)) demoReplies.set(bot, new Set())
+  demoReplies.get(bot).add(timer)
+}
+
+const DEMO_GREETING =
+  "Hi! I'm Riplika's demo partner 🤖 — a bot, so there's no camera. Type anything and I'll reply. Real people are always matched first."
+
+const DEMO_REPLIES = [
+  "Hey! 👋 I'm a demo bot, here so you can try the chat solo. Click Next whenever you want to look for a real person.",
+  "This text chat is the real thing — only the partner is simulated. Try Next, Report or Stop to see how they work.",
+  'Good one 😄 I can’t video chat, but real visitors are always matched with each other first.',
+  'You can change your gender and country preferences before starting a new search.',
+]
+
+function createDemoPartner(user) {
+  const userProfile = user.state.profile
+  return {
+    readyState: WebSocket.OPEN,
+    state: {
+      id: `demo-${newId()}`,
+      key: '',
+      demo: true,
+      joined: true,
+      profile: {
+        nickname: 'Demo Partner',
+        country: userProfile.countryPref === 'any' ? 'GB' : userProfile.countryPref,
+        gender: userProfile.lookingFor === 'any' ? 'na' : userProfile.lookingFor,
+        lookingFor: 'any',
+        countryPref: 'any',
+      },
+      partner: null,
+      searching: false,
+      queuedAt: 0,
+      connectedAt: 0,
+      recent: new Set(),
+      lastChat: [],
+      messageTimes: [],
+      actionTimes: [],
+      abuseStrikes: 0,
+      media: { cam: false, mic: false },
+      replyPending: false,
+    },
+    // Anything the server addresses to the bot is intentionally ignored.
+    send() {},
+  }
+}
+
+function scheduleDemoGreeting(user, bot) {
+  bot.state.replyPending = true
+  const typing = setTimeout(() => {
+    if (user.state.partner !== bot) {
+      bot.state.replyPending = false
+      return
+    }
+    send(user, { type: 'typing', on: true })
+    const greeting = setTimeout(() => {
+      if (user.state.partner !== bot) {
+        bot.state.replyPending = false
+        return
+      }
+      send(user, { type: 'typing', on: false })
+      send(user, { type: 'chat', from: 'them', text: DEMO_GREETING, ts: Date.now() })
+      bot.state.replyPending = false
+    }, 900)
+    trackDemoReply(bot, greeting)
+  }, 700)
+  trackDemoReply(bot, typing)
+}
+
+function queueDemoReply(user, bot, incomingText) {
+  if (bot.state.replyPending) return
+  bot.state.replyPending = true
+
+  const text = incomingText.toLowerCase()
+  const reply = /\b(hi|hello|hey)\b/.test(text)
+    ? "Hey! 👋 Nice to meet you. I'm a demo bot, so there's no video — but the chat is real. Try Next whenever you like."
+    : DEMO_REPLIES[Math.floor(Math.random() * DEMO_REPLIES.length)]
+
+  const typing = setTimeout(() => {
+    if (user.state.partner !== bot) {
+      bot.state.replyPending = false
+      return
+    }
+    send(user, { type: 'typing', on: true })
+    const message = setTimeout(() => {
+      if (user.state.partner !== bot) {
+        bot.state.replyPending = false
+        return
+      }
+      send(user, { type: 'typing', on: false })
+      send(user, { type: 'chat', from: 'them', text: reply, ts: Date.now() })
+      bot.state.replyPending = false
+    }, 1100)
+    trackDemoReply(bot, message)
+  }, 500)
+  trackDemoReply(bot, typing)
+}
+
+function scheduleDemoPartner(ws) {
+  if (!DEMO_PARTNER_ENABLED) return
+  clearDemoTimer(ws)
+  const timer = setTimeout(() => {
+    demoTimers.delete(ws)
+    if (!ws.state.joined || ws.state.partner || !ws.state.searching) return
+    if (ws.readyState !== WebSocket.OPEN) return
+    // A real visitor may have joined in the meantime; always prefer them.
+    const waiting = pickPartner(ws)
+    if (waiting) {
+      pair(ws, waiting)
+      return
+    }
+    const bot = createDemoPartner(ws)
+    pair(ws, bot)
+    // Make the UI show the bot as off camera straight away.
+    send(ws, { type: 'media', media: { cam: false, mic: false } })
+    scheduleDemoGreeting(ws, bot)
+  }, DEMO_WAIT_MS)
+  if (typeof timer.unref === 'function') timer.unref()
+  demoTimers.set(ws, timer)
 }
 
 function isBlocked(a, b) {
@@ -262,6 +413,8 @@ function remember(ws, partnerWs) {
 function endPair(ws, { notify = true, reason = 'left' } = {}) {
   const partner = ws.state.partner
   if (!partner) return
+  if (partner.state.demo) clearDemoReplies(partner)
+  if (ws.state.demo) clearDemoReplies(ws)
   ws.state.partner = null
   partner.state.partner = null
   if (notify) send(partner, { type: 'partner-left', reason })
@@ -276,7 +429,7 @@ function pair(a, b) {
   b.state.connectedAt = Date.now()
   remember(a, b)
   remember(b, a)
-  bumpChatsToday()
+  if (!a.state.demo && !b.state.demo) bumpChatsToday()
 
   const roomId = `room_${newId()}`
   const aInitiated = a.state.queuedAt <= b.state.queuedAt
@@ -302,6 +455,7 @@ function startSearching(ws) {
 
   queue.push(ws)
   send(ws, { type: 'queued' })
+  scheduleDemoPartner(ws)
   broadcastStats()
 }
 
@@ -315,7 +469,16 @@ function stopSearching(ws) {
 
 function handleReport(ws, msg) {
   const partner = ws.state.partner
-  if (!partner || !ws.state.key || !partner.state.key) return
+  if (!partner) return
+
+  if (partner.state.demo) {
+    send(ws, { type: 'reported' })
+    endPair(ws, { reason: 'left' })
+    broadcastStats()
+    return
+  }
+
+  if (!ws.state.key || !partner.state.key) return
 
   const now = Date.now()
   const lastReport = reportCooldowns.get(ws.state.key) ?? 0
@@ -412,7 +575,12 @@ function handleMessage(ws, raw) {
       state.profile = normalizeProfile(msg.profile)
       state.joined = true
       recomputeStats()
-      send(ws, { type: 'welcome', id: state.id, ...stats })
+      send(ws, {
+        type: 'welcome',
+        id: state.id,
+        ...stats,
+        demoWaitSeconds: DEMO_PARTNER_ENABLED ? Math.round(DEMO_WAIT_MS / 1000) : 0,
+      })
       broadcastStats()
       return
     }
@@ -473,6 +641,7 @@ function handleMessage(ws, raw) {
 
       send(ws, { type: 'chat', from: 'me', text, ts: now })
       send(state.partner, { type: 'chat', from: 'them', text, ts: now })
+      if (state.partner.state.demo) queueDemoReply(ws, state.partner, text)
       return
     }
 

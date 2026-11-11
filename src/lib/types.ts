@@ -13,6 +13,7 @@ export interface Partner {
   nickname: string
   country: string
   gender: string
+  demo?: boolean
 }
 
 export interface PublicStats {

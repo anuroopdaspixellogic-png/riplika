@@ -72,7 +72,7 @@ day. Blocks do not expire so a reported pair is never matched again.
 | `npm run dev` | Vite dev server + signaling server with watch mode |
 | `npm run build` | Type-check the client and build to `dist/` |
 | `npm start` | Serve `dist/` and signaling from one Node process (production) |
-| `npm run smoke` | SQLite persistence checks + 21 server checks (matching, filters, signaling, chat, reports, blocks, rate limits) |
+| `npm run smoke` | SQLite persistence checks + 24 server checks (matching, filters, signaling, chat, reports, blocks, rate limits, demo partner) |
 | `npm run smoke:store` | SQLite persistence checks only |
 | `npm run smoke:server` | Server checks only (needs a running server on `localhost:8787`) |
 | `npm run docker:build` | Build the production image as `riplika:latest` |
@@ -91,7 +91,7 @@ npm run smoke    # terminal 2
 `.github/workflows/ci.yml` runs on pushes to `main`/`master`, pull requests and
 manual dispatch. On Node 22.13 (the minimum) and Node 24 it installs from the
 lockfile, type-checks and builds, runs the SQLite persistence tests, then starts
-the production server with an in-memory database and runs the 21 server checks
+the production server with an in-memory database and runs the 24 server checks
 plus moderation-auth and security-header checks.
 
 ## Production
@@ -208,6 +208,8 @@ are passed to the container at runtime.
 | `REPORT_RETENTION_DAYS` | server | Days to keep reviewed reports (default `90`) |
 | `TRUST_PROXY` | server | Set `1` behind a trusted reverse proxy |
 | `MAX_CONNECTIONS_PER_IP` | server | Concurrent WebSocket cap per IP (default `8`) |
+| `DEMO_PARTNER` | server | Set `0` to disable the solo demo partner (default on) |
+| `DEMO_WAIT_SECONDS` | server | Seconds before the demo partner joins an empty queue (default `10`) |
 | `ALLOWED_ORIGINS` | server | Comma-separated WebSocket origin allowlist (optional) |
 | `VITE_TURN_URL` | client | TURN server URL, e.g. `turn:turn.example.com:3478` |
 | `VITE_TURN_USERNAME` | client | TURN username |
@@ -260,6 +262,12 @@ and picks the oldest compatible waiting client, requiring:
 Recent partners (last 6) are avoided when another candidate exists. A successful
 match creates a room, tells one side to create the WebRTC offer, and relays
 SDP/ICE messages until the peer connection is established.
+
+If nobody real is waiting for `DEMO_WAIT_SECONDS` (default 10), the visitor is
+paired with a clearly labelled **demo bot** instead. The bot has no camera and
+replies to text automatically, so one person can try the full flow. It is never
+offered while a compatible visitor is in the queue, and it is excluded from the
+online/chatting counters. Set `DEMO_PARTNER=0` to turn it off.
 
 ### Media and privacy
 
